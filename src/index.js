@@ -26,7 +26,7 @@ window.hello = hello;
 let accessToken, redirectUri;
 // if (process.env.NODE_ENV == 'development') {
 accessToken = '55f0486a9967a2ac5715';
-redirectUri = 'http://lvh.me:3002';
+redirectUri = 'http://lvh.me:3000';
 // } else {
 //   accessToken = '143fcf6817394a7cf33f'
 //   redirectUri = 'https://elm-explorer.netlify.com'
