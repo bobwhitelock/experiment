@@ -1,19 +1,54 @@
-module Main exposing (..)
+port module Main exposing (..)
 
-import Html exposing (Html, text, div, h1, img)
-import Html.Attributes exposing (src)
+import Json.Decode as D
+import Html exposing (..)
+import Html.Attributes exposing (..)
+
+
+port githubOauthSuccess : (String -> msg) -> Sub msg
+
 
 
 ---- MODEL ----
 
 
-type alias Model =
-    {}
+type Model
+    = Initial
+    | Authed String
+    | Error String
 
 
-init : ( Model, Cmd Msg )
-init =
-    ( {}, Cmd.none )
+init : D.Value -> ( Model, Cmd Msg )
+init flags =
+    let
+        model =
+            decodeFlags flags
+    in
+        model ! []
+
+
+decodeFlags : D.Value -> Model
+decodeFlags flagsJson =
+    let
+        decodeResult =
+            D.decodeValue flagsDecoder flagsJson
+    in
+        case decodeResult of
+            Ok token ->
+                case token of
+                    Just token_ ->
+                        Authed token_
+
+                    Nothing ->
+                        Initial
+
+            Err message ->
+                Error message
+
+
+flagsDecoder : D.Decoder (Maybe String)
+flagsDecoder =
+    (D.field "accessToken" (D.nullable D.string))
 
 
 
@@ -21,12 +56,22 @@ init =
 
 
 type Msg
-    = NoOp
+    = GithubOauthSuccess String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    ( model, Cmd.none )
+    case msg of
+        GithubOauthSuccess token ->
+            case model of
+                Initial ->
+                    Debug.log "post-initial" Authed token ! []
+
+                Error _ ->
+                    Debug.log "post-error" Authed token ! []
+
+                _ ->
+                    model ! []
 
 
 
@@ -35,21 +80,50 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    div []
-        [ img [ src "/logo.svg" ] []
-        , h1 [] [ text "Your Elm App is working!" ]
-        ]
+    let
+        stuff =
+            case model of
+                Initial ->
+                    div []
+                        [ button
+                            [ attribute "onclick" "window.hello('github').login()"
+                            ]
+                            [ text "Authenticate!" ]
+                        ]
+
+                Authed data ->
+                    span [] [ text ("hooray: " ++ data) ]
+
+                Error error ->
+                    span [] [ text ("oh no: " ++ error) ]
+    in
+        div []
+            [ stuff
+            , button
+                [ attribute "onclick" "window.hello('github').logout()"
+                ]
+                [ text "Log out" ]
+            ]
+
+
+
+---- SUBSCRIPTIONS ----
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    githubOauthSuccess GithubOauthSuccess
 
 
 
 ---- PROGRAM ----
 
 
-main : Program Never Model Msg
+main : Program D.Value Model Msg
 main =
-    Html.program
+    Html.programWithFlags
         { view = view
         , init = init
         , update = update
-        , subscriptions = always Sub.none
+        , subscriptions = subscriptions
         }
