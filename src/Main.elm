@@ -1,10 +1,10 @@
 port module Main exposing (..)
 
-import Json.Encode as E
-import Json.Decode as D
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Http
+import Json.Decode as D
+import Json.Encode as E
 
 
 port githubOauthSuccess : (String -> msg) -> Sub msg
@@ -36,7 +36,7 @@ init flags =
                 _ ->
                     []
     in
-        model ! commands
+    model ! commands
 
 
 decodeFlags : D.Value -> Model
@@ -45,22 +45,22 @@ decodeFlags flagsJson =
         decodeResult =
             D.decodeValue flagsDecoder flagsJson
     in
-        case decodeResult of
-            Ok token ->
-                case token of
-                    Just token_ ->
-                        Authed token_
+    case decodeResult of
+        Ok token ->
+            case token of
+                Just token_ ->
+                    Authed token_
 
-                    Nothing ->
-                        Initial
+                Nothing ->
+                    Initial
 
-            Err message ->
-                Error message
+        Err message ->
+            Error message
 
 
 flagsDecoder : D.Decoder (Maybe String)
 flagsDecoder =
-    (D.field "accessToken" (D.nullable D.string))
+    D.field "accessToken" (D.nullable D.string)
 
 
 
@@ -121,13 +121,13 @@ view model =
                 IssueLoadError error ->
                     span [] [ text ("oh no: " ++ error) ]
     in
-        div []
-            [ stuff
-            , button
-                [ attribute "onclick" "window.hello('github').logout()"
-                ]
-                [ text "Log out" ]
+    div []
+        [ stuff
+        , button
+            [ attribute "onclick" "window.hello('github').logout()"
             ]
+            [ text "Log out" ]
+        ]
 
 
 requestIssues : String -> Cmd Msg
@@ -144,7 +144,8 @@ postForIssues accessToken =
         , body = Http.jsonBody issuesGraphqlQuery
         , expect =
             Http.expectString
-            -- , expect = Http.expectJson packagesDataDecoder
+
+        -- , expect = Http.expectJson packagesDataDecoder
         , timeout = Nothing
         , withCredentials = False
         }
@@ -182,11 +183,11 @@ issuesGraphqlQuery =
             }
             """
     in
-        E.object
-            [ ( "query"
-              , E.string graphql
-              )
-            ]
+    E.object
+        [ ( "query"
+          , E.string graphql
+          )
+        ]
 
 
 
