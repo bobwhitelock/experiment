@@ -1,10 +1,15 @@
 port module Main exposing (..)
 
+import Bootstrap.Card as Card
+import Bootstrap.Card.Block as Block
+import Bootstrap.Grid as Grid
+import Bootstrap.Utilities.Spacing as Spacing
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Http
 import Json.Decode as D
 import Json.Encode as E
+import Markdown
 
 
 port githubOauthSuccess : (String -> msg) -> Sub msg
@@ -24,6 +29,7 @@ type Model
 
 type alias Repo =
     { nameWithOwner : String
+    , ownerAvatarUrl : String
     , matchingIssues : List Issue
     }
 
@@ -31,7 +37,7 @@ type alias Repo =
 type alias Issue =
     { title : String
     , url : String
-    , bodyText : String
+    , body : String
     , authorLogin : String
     , authorAvatarUrl : String
     , labels : List Label
@@ -138,23 +144,55 @@ view model =
                     span [] [ text ("oh no: " ++ error) ]
 
                 Loaded repos ->
-                    div [] (List.map viewRepo repos)
+                    div [] (List.concatMap viewRepo repos)
 
                 DataLoadError error ->
                     span [] [ text ("oh no: " ++ error) ]
     in
-    div []
-        [ stuff
-        , button
-            [ attribute "onclick" "window.hello('github').logout()"
+    Grid.container []
+        [ Grid.row []
+            [ Grid.col []
+                [ stuff
+                , button
+                    [ attribute "onclick" "window.hello('github').logout()"
+                    ]
+                    [ text "Log out" ]
+                ]
             ]
-            [ text "Log out" ]
         ]
 
 
-viewRepo : Repo -> Html msg
+viewRepo : Repo -> List (Html msg)
 viewRepo repo =
-    div [] [ text repo.nameWithOwner ]
+    List.map (viewIssue repo) repo.matchingIssues
+
+
+viewIssue : Repo -> Issue -> Html msg
+viewIssue repo issue =
+    Card.config [ Card.attrs [ Spacing.m3 ] ]
+        |> Card.header []
+            [ titleLine
+                repo.ownerAvatarUrl
+                (em [] [ text repo.nameWithOwner ])
+            , titleLine
+                issue.authorAvatarUrl
+                (text issue.title)
+            ]
+        |> Card.block []
+            [ Block.text []
+                [ Markdown.toHtml [] issue.body
+                ]
+            ]
+        |> Card.view
+
+
+titleLine : String -> Html msg -> Html msg
+titleLine avatarUrl title =
+    div []
+        [ img [ src avatarUrl, width 30 ] []
+        , text " "
+        , title
+        ]
 
 
 requestIssues : String -> Cmd Msg
@@ -185,11 +223,14 @@ issuesGraphqlQuery =
                 starredRepositories(last: 10) {
                   nodes {
                     nameWithOwner
+                    owner {
+                      avatarUrl
+                    }
                     issues(last: 50, labels: ["help wanted"]) {
                       nodes {
                         title
                         url
-                        bodyText
+                        body
                         author {
                           login
                           avatarUrl
@@ -224,8 +265,9 @@ dataDecoder =
 
 repoDecoder : D.Decoder Repo
 repoDecoder =
-    D.map2 Repo
+    D.map3 Repo
         (D.field "nameWithOwner" D.string)
+        (D.at [ "owner", "avatarUrl" ] D.string)
         (D.at [ "issues", "nodes" ] (D.list issueDecoder))
 
 
@@ -234,7 +276,7 @@ issueDecoder =
     D.map6 Issue
         (D.field "title" D.string)
         (D.field "url" D.string)
-        (D.field "bodyText" D.string)
+        (D.field "body" D.string)
         (D.at [ "author", "login" ] D.string)
         (D.at [ "author", "avatarUrl" ] D.string)
         (D.at [ "labels", "nodes" ] (D.list labelDecoder))
