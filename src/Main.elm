@@ -1,5 +1,6 @@
 port module Main exposing (..)
 
+import Bootstrap.Badge as Badge
 import Bootstrap.Card as Card
 import Bootstrap.Card.Block as Block
 import Bootstrap.Grid as Grid
@@ -169,14 +170,20 @@ viewRepo repo =
 
 viewIssue : Repo -> Issue -> Html msg
 viewIssue repo issue =
+    let
+        repoTitle =
+            em [] [ text repo.nameWithOwner ]
+
+        issueTitleWithLabels =
+            span []
+                (([ text issue.title ] ++ List.map viewLabel issue.labels)
+                    |> List.intersperse (text " ")
+                )
+    in
     Card.config [ Card.attrs [ Spacing.m3 ] ]
         |> Card.header []
-            [ titleLine
-                repo.ownerAvatarUrl
-                (em [] [ text repo.nameWithOwner ])
-            , titleLine
-                issue.authorAvatarUrl
-                (text issue.title)
+            [ titleLine repo.ownerAvatarUrl repoTitle
+            , titleLine issue.authorAvatarUrl issueTitleWithLabels
             ]
         |> Card.block []
             [ Block.text []
@@ -184,6 +191,16 @@ viewIssue repo issue =
                 ]
             ]
         |> Card.view
+
+
+viewLabel : Label -> Html msg
+viewLabel label =
+    -- Particular badge type used here doesn't matter as override the
+    -- background color, apart from that this badge has dark text which looks
+    -- slightly better and is the same as used on GitHub.
+    Badge.badgeLight
+        [ style [ ( "background-color", "#" ++ label.color ) ] ]
+        [ text label.name ]
 
 
 titleLine : String -> Html msg -> Html msg
