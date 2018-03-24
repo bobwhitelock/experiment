@@ -18,8 +18,30 @@ type Model
     = Initial
     | Error String
     | Authed String
-    | Loaded String
-    | IssueLoadError String
+    | Loaded (List Repo)
+    | DataLoadError String
+
+
+type alias Repo =
+    { nameWithOwner : String
+    , matchingIssues : List Issue
+    }
+
+
+type alias Issue =
+    { title : String
+    , url : String
+    , bodyText : String
+    , authorLogin : String
+    , authorAvatarUrl : String
+    , labels : List Label
+    }
+
+
+type alias Label =
+    { name : String
+    , color : String
+    }
 
 
 init : D.Value -> ( Model, Cmd Msg )
@@ -69,7 +91,7 @@ flagsDecoder =
 
 type Msg
     = GithubOauthSuccess String
-    | IssuesLoaded (Result Http.Error String)
+    | DataLoaded (Result Http.Error (List Repo))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -83,13 +105,13 @@ update msg model =
                 _ ->
                     model ! []
 
-        IssuesLoaded issues ->
-            case issues of
-                Ok issues_ ->
-                    Loaded issues_ ! []
+        DataLoaded data ->
+            case data of
+                Ok repos ->
+                    Loaded repos ! []
 
                 Err error ->
-                    IssueLoadError (toString error) ! []
+                    DataLoadError (toString error) ! []
 
 
 
@@ -115,10 +137,10 @@ view model =
                 Error error ->
                     span [] [ text ("oh no: " ++ error) ]
 
-                Loaded issues ->
-                    span [] [ text issues ]
+                Loaded repos ->
+                    div [] (List.map viewRepo repos)
 
-                IssueLoadError error ->
+                DataLoadError error ->
                     span [] [ text ("oh no: " ++ error) ]
     in
     div []
@@ -130,22 +152,24 @@ view model =
         ]
 
 
+viewRepo : Repo -> Html msg
+viewRepo repo =
+    div [] [ text repo.nameWithOwner ]
+
+
 requestIssues : String -> Cmd Msg
 requestIssues accessToken =
-    Http.send IssuesLoaded (postForIssues accessToken)
+    Http.send DataLoaded (postForData accessToken)
 
 
-postForIssues : String -> Http.Request String
-postForIssues accessToken =
+postForData : String -> Http.Request (List Repo)
+postForData accessToken =
     Http.request
         { method = "POST"
         , headers = [ Http.header "Authorization" ("bearer " ++ accessToken) ]
         , url = "https://api.github.com/graphql"
         , body = Http.jsonBody issuesGraphqlQuery
-        , expect =
-            Http.expectString
-
-        -- , expect = Http.expectJson packagesDataDecoder
+        , expect = Http.expectJson dataDecoder
         , timeout = Nothing
         , withCredentials = False
         }
@@ -158,9 +182,9 @@ issuesGraphqlQuery =
             """
             {
               viewer {
-                starredRepositories(last: 50) {
+                starredRepositories(last: 10) {
                   nodes {
-                    name
+                    nameWithOwner
                     issues(last: 50, labels: ["help wanted"]) {
                       nodes {
                         title
@@ -173,6 +197,7 @@ issuesGraphqlQuery =
                         labels(first: 10) {
                           nodes {
                             name
+                            color
                           }
                         }
                       }
@@ -188,6 +213,38 @@ issuesGraphqlQuery =
           , E.string graphql
           )
         ]
+
+
+dataDecoder : D.Decoder (List Repo)
+dataDecoder =
+    D.at
+        [ "data", "viewer", "starredRepositories", "nodes" ]
+        (D.list repoDecoder)
+
+
+repoDecoder : D.Decoder Repo
+repoDecoder =
+    D.map2 Repo
+        (D.field "nameWithOwner" D.string)
+        (D.at [ "issues", "nodes" ] (D.list issueDecoder))
+
+
+issueDecoder : D.Decoder Issue
+issueDecoder =
+    D.map6 Issue
+        (D.field "title" D.string)
+        (D.field "url" D.string)
+        (D.field "bodyText" D.string)
+        (D.at [ "author", "login" ] D.string)
+        (D.at [ "author", "avatarUrl" ] D.string)
+        (D.at [ "labels", "nodes" ] (D.list labelDecoder))
+
+
+labelDecoder : D.Decoder Label
+labelDecoder =
+    D.map2 Label
+        (D.field "name" D.string)
+        (D.field "color" D.string)
 
 
 
