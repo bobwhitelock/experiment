@@ -30,6 +30,8 @@ type Model
 
 type alias Repo =
     { nameWithOwner : String
+    , url : String
+    , ownerUrl : String
     , ownerAvatarUrl : String
     , matchingIssues : List Issue
     }
@@ -40,6 +42,7 @@ type alias Issue =
     , url : String
     , body : String
     , authorLogin : String
+    , authorUrl : String
     , authorAvatarUrl : String
     , labels : List Label
     }
@@ -182,8 +185,16 @@ viewIssue repo issue =
     in
     Card.config [ Card.attrs [ Spacing.m3 ] ]
         |> Card.header []
-            [ titleLine repo.ownerAvatarUrl repoTitle
-            , titleLine issue.authorAvatarUrl issueTitleWithLabels
+            [ titleLine
+                repo.ownerUrl
+                repo.ownerAvatarUrl
+                repo.url
+                repoTitle
+            , titleLine
+                issue.authorUrl
+                issue.authorAvatarUrl
+                issue.url
+                issueTitleWithLabels
             ]
         |> Card.block []
             [ Block.text []
@@ -203,12 +214,12 @@ viewLabel label =
         [ text label.name ]
 
 
-titleLine : String -> Html msg -> Html msg
-titleLine avatarUrl title =
+titleLine : String -> String -> String -> Html msg -> Html msg
+titleLine userUrl avatarUrl titleUrl title =
     div []
-        [ img [ src avatarUrl, width 30 ] []
+        [ a [ href userUrl ] [ img [ src avatarUrl, width 30 ] [] ]
         , text " "
-        , title
+        , a [ href titleUrl ] [ title ]
         ]
 
 
@@ -240,7 +251,9 @@ issuesGraphqlQuery =
                 starredRepositories(last: 10) {
                   nodes {
                     nameWithOwner
+                    url
                     owner {
+                      url
                       avatarUrl
                     }
                     issues(last: 50, labels: ["help wanted"]) {
@@ -250,6 +263,7 @@ issuesGraphqlQuery =
                         body
                         author {
                           login
+                          url
                           avatarUrl
                         }
                         labels(first: 10) {
@@ -282,19 +296,22 @@ dataDecoder =
 
 repoDecoder : D.Decoder Repo
 repoDecoder =
-    D.map3 Repo
+    D.map5 Repo
         (D.field "nameWithOwner" D.string)
+        (D.field "url" D.string)
+        (D.at [ "owner", "url" ] D.string)
         (D.at [ "owner", "avatarUrl" ] D.string)
         (D.at [ "issues", "nodes" ] (D.list issueDecoder))
 
 
 issueDecoder : D.Decoder Issue
 issueDecoder =
-    D.map6 Issue
+    D.map7 Issue
         (D.field "title" D.string)
         (D.field "url" D.string)
         (D.field "body" D.string)
         (D.at [ "author", "login" ] D.string)
+        (D.at [ "author", "url" ] D.string)
         (D.at [ "author", "avatarUrl" ] D.string)
         (D.at [ "labels", "nodes" ] (D.list labelDecoder))
 
