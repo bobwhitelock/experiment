@@ -256,7 +256,7 @@ issuesGraphqlQuery =
                       url
                       avatarUrl
                     }
-                    issues(last: 50, labels: ["help wanted"]) {
+                    issues(last: 50, labels: ["help wanted"], states: [OPEN]) {
                       nodes {
                         title
                         url
